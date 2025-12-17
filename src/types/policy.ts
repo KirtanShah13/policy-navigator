@@ -9,6 +9,7 @@ export interface PolicyCitation {
   policyName: string;
   section: string;
   version: string;
+  pageNumber?: number;
   excerpt: string;
   documentUrl: string;
 }
