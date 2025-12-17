@@ -2,7 +2,7 @@ import { ChatMessage as ChatMessageType } from '@/types/policy';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import { CitationCard } from './CitationCard';
 import { FeedbackControls } from './FeedbackControls';
-import { User, Bot, FileText } from 'lucide-react';
+import { User, Bot } from 'lucide-react';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -34,42 +34,19 @@ export function ChatMessage({ message, onFeedback }: ChatMessageProps) {
           <time className="text-xs text-muted-foreground">
             {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </time>
+          {isAssistant && message.confidence && (
+            <ConfidenceBadge level={message.confidence} />
+          )}
         </div>
 
         <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
           {message.content}
         </div>
 
-        {/* Inline Reference Summary with Confidence */}
         {isAssistant && message.citations && message.citations.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mt-3 p-3 bg-muted/50 rounded-md border border-border">
-            <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <span className="text-xs font-medium text-muted-foreground">References:</span>
-            {message.citations.map((citation, index) => (
-              <span
-                key={citation.id}
-                className="inline-flex items-center gap-1 text-xs bg-background px-2 py-1 rounded border border-border"
-              >
-                <span className="font-medium text-foreground">{citation.policyName}</span>
-                <span className="text-muted-foreground">
-                  §{citation.section}
-                  {citation.pageNumber && `, p.${citation.pageNumber}`}
-                </span>
-              </span>
-            ))}
-            {message.confidence && (
-              <div className="ml-auto">
-                <ConfidenceBadge level={message.confidence} />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Detailed Citations */}
-        {isAssistant && message.citations && message.citations.length > 0 && (
-          <div className="space-y-2 mt-2">
+          <div className="space-y-2 mt-4">
             <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Source Details ({message.citations.length})
+              Sources ({message.citations.length})
             </h3>
             <div className="space-y-2">
               {message.citations.map((citation, index) => (

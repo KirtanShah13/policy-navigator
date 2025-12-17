@@ -27,7 +27,6 @@ export function CitationCard({ citation, index }: CitationCardProps) {
             </h4>
             <p className="text-xs text-muted-foreground mt-0.5">
               Section {citation.section} • Version {citation.version}
-              {citation.pageNumber && ` • Page ${citation.pageNumber}`}
             </p>
           </div>
         </div>
