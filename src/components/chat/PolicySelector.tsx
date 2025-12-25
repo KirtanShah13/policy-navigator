@@ -1,5 +1,5 @@
 import { PolicyScope } from '@/types/policy';
-import { Building2, Shield, DollarSign, Lock } from 'lucide-react';
+import { Building2, Shield, DollarSign, Lock, Layers } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -14,7 +14,7 @@ interface PolicySelectorProps {
 }
 
 const scopeConfig: Record<PolicyScope | 'all', { label: string; icon: React.ComponentType<{ className?: string }> }> = {
-  all: { label: 'All Policies', icon: Building2 },
+  all: { label: 'All Policies', icon: Layers },
   hr: { label: 'HR Policies', icon: Building2 },
   it: { label: 'IT Policies', icon: Shield },
   finance: { label: 'Finance Policies', icon: DollarSign },
@@ -23,7 +23,7 @@ const scopeConfig: Record<PolicyScope | 'all', { label: string; icon: React.Comp
 
 export function PolicySelector({ value, onChange }: PolicySelectorProps) {
   const currentScope = scopeConfig[value];
-  const Icon = currentScope.icon;
+  const CurrentIcon = currentScope.icon;
 
   return (
     <div className="flex items-center gap-2">
@@ -33,19 +33,19 @@ export function PolicySelector({ value, onChange }: PolicySelectorProps) {
       <Select value={value} onValueChange={(v) => onChange(v as PolicyScope | 'all')}>
         <SelectTrigger id="policy-scope" className="w-[180px] h-9">
           <div className="flex items-center gap-2">
-            <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            <SelectValue />
+            <CurrentIcon className="h-4 w-4 text-primary" aria-hidden="true" />
+            <span>{currentScope.label}</span>
           </div>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-popover border border-border shadow-lg">
           {(Object.keys(scopeConfig) as (PolicyScope | 'all')[]).map((scope) => {
             const config = scopeConfig[scope];
             const ScopeIcon = config.icon;
             return (
-              <SelectItem key={scope} value={scope}>
+              <SelectItem key={scope} value={scope} className="cursor-pointer">
                 <div className="flex items-center gap-2">
                   <ScopeIcon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  {config.label}
+                  <span>{config.label}</span>
                 </div>
               </SelectItem>
             );
