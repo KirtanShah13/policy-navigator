@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { MessageSquare, FileText, Settings, LogOut, Users, Plus, History, ChevronDown } from 'lucide-react';
+import { MessageSquare, FileText, Settings, LogOut, Users, Plus, History, ChevronRight } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { UserRole } from '@/types/policy';
 import { Button } from '@/components/ui/button';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { ChatHistoryItem, ChatSession } from '@/components/chat/ChatHistoryItem';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -52,6 +51,11 @@ export function Sidebar({ userRole, userName, onLogout }: SidebarProps) {
     setActiveChatId(null);
   };
 
+  const toggleHistory = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setHistoryOpen(!historyOpen);
+  };
+
   return (
     <aside className="w-72 bg-sidebar border-r border-sidebar-border flex flex-col h-screen">
       {/* Header */}
@@ -68,7 +72,7 @@ export function Sidebar({ userRole, userName, onLogout }: SidebarProps) {
       </div>
 
       {/* New Chat Button */}
-      <div className="p-3">
+      <div className="p-3 border-b border-sidebar-border">
         <Button
           variant="outline"
           size="sm"
@@ -80,31 +84,49 @@ export function Sidebar({ userRole, userName, onLogout }: SidebarProps) {
         </Button>
       </div>
 
-      {/* Chat History */}
-      <Collapsible open={historyOpen} onOpenChange={setHistoryOpen} className="flex-1 flex flex-col min-h-0">
-        <CollapsibleTrigger className="flex items-center justify-between px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+      {/* Chat History Section */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <button
+          type="button"
+          onClick={toggleHistory}
+          className="flex items-center justify-between px-4 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 transition-colors w-full text-left"
+        >
           <div className="flex items-center gap-2">
             <History className="h-3.5 w-3.5" />
-            Chat History
+            <span>Chat History</span>
+            <span className="text-2xs bg-muted px-1.5 py-0.5 rounded-full">{chatHistory.length}</span>
           </div>
-          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", historyOpen && "rotate-180")} />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="flex-1 min-h-0">
-          <ScrollArea className="h-[180px] px-2">
-            <div className="space-y-1 pr-2">
-              {chatHistory.map((session) => (
-                <ChatHistoryItem
-                  key={session.id}
-                  session={session}
-                  isActive={activeChatId === session.id}
-                  onClick={() => setActiveChatId(session.id)}
-                  onDelete={() => handleDeleteChat(session.id)}
-                />
-              ))}
+          <ChevronRight className={cn(
+            "h-3.5 w-3.5 transition-transform duration-200",
+            historyOpen && "rotate-90"
+          )} />
+        </button>
+        
+        <div className={cn(
+          "overflow-hidden transition-all duration-200",
+          historyOpen ? "flex-1" : "h-0"
+        )}>
+          <ScrollArea className="h-full px-2">
+            <div className="space-y-1 py-1 pr-2">
+              {chatHistory.length === 0 ? (
+                <p className="text-2xs text-muted-foreground px-3 py-4 text-center">
+                  No chat history yet
+                </p>
+              ) : (
+                chatHistory.map((session) => (
+                  <ChatHistoryItem
+                    key={session.id}
+                    session={session}
+                    isActive={activeChatId === session.id}
+                    onClick={() => setActiveChatId(session.id)}
+                    onDelete={() => handleDeleteChat(session.id)}
+                  />
+                ))
+              )}
             </div>
           </ScrollArea>
-        </CollapsibleContent>
-      </Collapsible>
+        </div>
+      </div>
 
       {/* Navigation */}
       <nav className="p-3 space-y-1 border-t border-sidebar-border" aria-label="Main navigation">
