@@ -1,168 +1,206 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PolicySelector } from '@/components/chat/PolicySelector';
-import { ChatMessage as ChatMessageType, PolicyScope, User } from '@/types/policy';
+import {
+  ChatMessage as ChatMessageType,
+  PolicyScope,
+  User,
+  FeedbackType,
+} from '@/types/policy';
+import { chatService } from '@/services/chatService';
+import { chatMessageService } from '@/services/chatMessageService';
 
-// Demo responses with citations
-const demoResponses: Record<string, ChatMessageType> = {
+/* ---------------- DEMO RESPONSE TEMPLATES ---------------- */
+
+const demoResponses: Record<
+  string,
+  Omit<ChatMessageType, 'id' | 'timestamp' | 'scope'>
+> = {
   default: {
-    id: '',
     role: 'assistant',
-    content: 'Based on our company policies, I can help you with questions about HR, IT, Finance, and Security policies. Please ask a specific question about any policy area.',
-    timestamp: new Date(),
+    content:
+      'Based on our company policies, I can help you with questions about HR, IT, Finance, and Security policies.',
     confidence: 'high',
     citations: [],
     feedback: null,
   },
   pto: {
-    id: '',
     role: 'assistant',
-    content: 'According to our PTO policy, full-time employees receive 20 days of paid time off per year, accrued monthly at 1.67 days per month. PTO requests should be submitted at least 2 weeks in advance for approval by your direct manager. Unused PTO can be carried over up to a maximum of 5 days into the following year.',
-    timestamp: new Date(),
+    content:
+      'Full-time employees receive 20 days of paid time off per year, accrued monthly. PTO requests must be submitted at least 2 weeks in advance.',
     confidence: 'high',
-    citations: [
-      {
-        id: '1',
-        policyName: 'Employee Time Off Policy',
-        section: '3.2',
-        version: '2.1',
-        excerpt: 'Full-time employees are entitled to twenty (20) days of paid time off per calendar year. PTO accrues at a rate of 1.67 days per month of active employment.',
-        documentUrl: '#',
-      },
-      {
-        id: '2',
-        policyName: 'Employee Time Off Policy',
-        section: '4.1',
-        version: '2.1',
-        excerpt: 'PTO requests must be submitted through the HR system at least fourteen (14) calendar days prior to the requested start date. Manager approval is required for all PTO requests.',
-        documentUrl: '#',
-      },
-    ],
+    citations: [],
     feedback: null,
   },
   password: {
-    id: '',
     role: 'assistant',
-    content: 'Our password policy requires passwords to be at least 12 characters long, containing uppercase, lowercase, numbers, and special characters. Passwords must be changed every 90 days and cannot be reused within the last 12 password cycles. Multi-factor authentication is mandatory for all systems containing sensitive data.',
-    timestamp: new Date(),
+    content:
+      'Passwords must be at least 12 characters long, changed every 90 days, and MFA is mandatory.',
     confidence: 'high',
-    citations: [
-      {
-        id: '3',
-        policyName: 'Information Security Policy',
-        section: '5.3.1',
-        version: '3.0',
-        excerpt: 'All user passwords must meet the following complexity requirements: minimum 12 characters, at least one uppercase letter, one lowercase letter, one numeric digit, and one special character.',
-        documentUrl: '#',
-      },
-    ],
+    citations: [],
     feedback: null,
   },
   expense: {
-    id: '',
     role: 'assistant',
-    content: 'Expense reports must be submitted within 30 days of incurring the expense. Receipts are required for any expense over $25. Manager approval is required for expenses under $500, while expenses over $500 require VP approval. Travel expenses should be pre-approved when possible.',
-    timestamp: new Date(),
+    content:
+      'Expense reports must be submitted within 30 days. Receipts are required for expenses over $25.',
     confidence: 'medium',
-    citations: [
-      {
-        id: '4',
-        policyName: 'Travel and Expense Policy',
-        section: '2.4',
-        version: '1.8',
-        excerpt: 'All expense reports must be submitted within thirty (30) days of the date the expense was incurred. Original receipts or digital copies must be attached for any individual expense exceeding $25.',
-        documentUrl: '#',
-      },
-    ],
+    citations: [],
     feedback: null,
   },
 };
 
+/* ---------------- COMPONENT ---------------- */
+
 export default function Chat() {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const [user, setUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [selectedScope, setSelectedScope] = useState<PolicyScope | 'all'>('all');
   const [isLoading, setIsLoading] = useState(false);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+
+  /* ---------------- AUTH ---------------- */
 
   useEffect(() => {
     const storedUser = localStorage.getItem('policyrag_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    } else {
+    if (!storedUser) {
       navigate('/auth');
+      return;
     }
+    setUser(JSON.parse(storedUser));
   }, [navigate]);
+
+  /* ---------------- LOAD ACTIVE CHAT & MESSAGES ---------------- */
+
+  useEffect(() => {
+    const loadChat = (chatId?: string) => {
+      const id = chatId ?? chatService.getActiveChat();
+
+      if (!id) {
+        setActiveChatId(null);
+        setMessages([]);
+        return;
+      }
+
+      setActiveChatId(id);
+
+      const storedMessages = chatMessageService
+        .getMessages(id)
+        .map((msg) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp),
+        }));
+
+      setMessages(storedMessages);
+    };
+
+    // Initial load
+    loadChat();
+
+    // Listen for sidebar-triggered chat changes
+    const handler = (e: Event) => {
+      const chatId = (e as CustomEvent<string>).detail;
+      loadChat(chatId);
+    };
+
+    window.addEventListener('active-chat-changed', handler);
+    return () => {
+      window.removeEventListener('active-chat-changed', handler);
+    };
+  }, []);
+
+  /* ---------------- AUTO SCROLL ---------------- */
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isLoading]);
 
   const handleLogout = () => {
     localStorage.removeItem('policyrag_user');
     navigate('/auth');
   };
 
+  /* ---------------- SEND MESSAGE ---------------- */
+
   const handleSubmit = async (content: string) => {
+    if (!activeChatId) return;
+
+    const scope = selectedScope === 'all' ? undefined : selectedScope;
+
     const userMessage: ChatMessageType = {
       id: crypto.randomUUID(),
       role: 'user',
       content,
       timestamp: new Date(),
-      scope: selectedScope === 'all' ? undefined : selectedScope,
+      scope,
     };
+
+    chatMessageService.appendMessage(activeChatId, userMessage);
+    chatService.incrementMessageCount(activeChatId);
 
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((r) => setTimeout(r, 800));
 
-    // Demo: Match keywords to responses
-    const lowerContent = content.toLowerCase();
-    let response: ChatMessageType;
+    const lower = content.toLowerCase();
+    let template = demoResponses.default;
 
-    if (lowerContent.includes('pto') || lowerContent.includes('vacation') || lowerContent.includes('time off')) {
-      response = { ...demoResponses.pto };
-    } else if (lowerContent.includes('password') || lowerContent.includes('security') || lowerContent.includes('mfa')) {
-      response = { ...demoResponses.password };
-    } else if (lowerContent.includes('expense') || lowerContent.includes('travel') || lowerContent.includes('receipt')) {
-      response = { ...demoResponses.expense };
-    } else {
-      response = { ...demoResponses.default };
+    if (lower.includes('pto') || lower.includes('vacation')) {
+      template = demoResponses.pto;
+    } else if (lower.includes('password') || lower.includes('mfa')) {
+      template = demoResponses.password;
+    } else if (lower.includes('expense') || lower.includes('receipt')) {
+      template = demoResponses.expense;
     }
 
-    response.id = crypto.randomUUID();
-    response.timestamp = new Date();
+    const assistantMessage: ChatMessageType = {
+      ...template,
+      id: crypto.randomUUID(),
+      timestamp: new Date(),
+      scope,
+    };
 
-    setMessages((prev) => [...prev, response]);
+    chatMessageService.appendMessage(activeChatId, assistantMessage);
+    chatService.incrementMessageCount(activeChatId);
+
+    setMessages((prev) => [...prev, assistantMessage]);
     setIsLoading(false);
   };
 
-  const handleFeedback = (messageId: string, feedback: 'helpful' | 'incorrect') => {
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === messageId ? { ...msg, feedback: msg.feedback === feedback ? null : feedback } : msg
-      )
+  /* ---------------- FEEDBACK ---------------- */
+
+  const handleFeedback = (messageId: string, feedback: FeedbackType) => {
+    if (!activeChatId) return;
+
+    const updated = messages.map((msg) =>
+      msg.id === messageId
+        ? { ...msg, feedback: msg.feedback === feedback ? null : feedback }
+        : msg
     );
+
+    setMessages(updated);
+    chatMessageService.saveMessages(activeChatId, updated);
   };
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return (
     <AppLayout userRole={user.role} userName={user.name} onLogout={handleLogout}>
       <div className="flex flex-col h-full">
         {/* Header */}
-        <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-background">
+        <header className="flex items-center justify-between px-6 py-4 border-b">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Policy Assistant</h2>
-            <p className="text-sm text-muted-foreground">Ask questions about company policies</p>
+            <h2 className="text-lg font-semibold">Policy Assistant</h2>
+            <p className="text-sm text-muted-foreground">
+              Ask questions about company policies
+            </p>
           </div>
           <PolicySelector value={selectedScope} onChange={setSelectedScope} />
         </header>
@@ -171,24 +209,26 @@ export default function Chat() {
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto py-6 px-4 space-y-4">
             {messages.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">
-                  Ask a question about company policies to get started.
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Try: "What is the PTO policy?" or "How do I submit expenses?"
-                </p>
+              <div className="text-center py-12 text-muted-foreground">
+                Try asking about PTO, passwords, or expenses
               </div>
             )}
-            {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} onFeedback={handleFeedback} />
+
+            {messages.map((msg) => (
+              <ChatMessage
+                key={msg.id}
+                message={msg}
+                onFeedback={handleFeedback}
+              />
             ))}
+
             {isLoading && (
               <div className="flex items-center gap-2 text-muted-foreground p-4">
                 <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                <span className="text-sm">Searching policies...</span>
+                <span className="text-sm">Searching policies…</span>
               </div>
             )}
+
             <div ref={messagesEndRef} />
           </div>
         </div>

@@ -1,34 +1,74 @@
-import { useState } from 'react';
-import { MessageSquare, FileText, Settings, LogOut, Users, Plus, History, ChevronRight } from 'lucide-react';
+import {
+  MessageSquare,
+  FileText,
+  Settings,
+  LogOut,
+  Users,
+  Plus,
+  History,
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { NavLink } from '@/components/NavLink';
-import { UserRole } from '@/types/policy';
+import { UserRole, ChatSession } from '@/types/policy';
 import { Button } from '@/components/ui/button';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
-import { ChatHistoryItem, ChatSession } from '@/components/chat/ChatHistoryItem';
-import { cn } from '@/lib/utils';
+import { ChatHistoryItem } from '@/components/chat/ChatHistoryItem';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
+import { chatService } from '@/services/chatService';
 
 interface SidebarProps {
   userRole: UserRole;
   userName: string;
   onLogout: () => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-// Mock chat history data - in production this would come from API
-const mockChatHistory: ChatSession[] = [
-  { id: '1', title: 'PTO policy questions', timestamp: new Date(), messageCount: 4 },
-  { id: '2', title: 'Password requirements', timestamp: new Date(Date.now() - 86400000), messageCount: 6 },
-  { id: '3', title: 'Expense report help', timestamp: new Date(Date.now() - 172800000), messageCount: 3 },
-  { id: '4', title: 'Remote work guidelines', timestamp: new Date(Date.now() - 432000000), messageCount: 8 },
-  { id: '5', title: 'Benefits enrollment', timestamp: new Date(Date.now() - 604800000), messageCount: 5 },
-];
-
-export function Sidebar({ userRole, userName, onLogout }: SidebarProps) {
+export function Sidebar({
+  userRole,
+  userName,
+  onLogout,
+  collapsed,
+  onToggleCollapse,
+}: SidebarProps) {
   const isAdmin = userRole === 'admin';
   const isHRorAdmin = userRole === 'hr' || userRole === 'admin';
-  const [chatHistory, setChatHistory] = useState<ChatSession[]>(mockChatHistory);
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+
   const [historyOpen, setHistoryOpen] = useState(true);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
+
+  /* ───────────── SINGLE SOURCE OF TRUTH ───────────── */
+  const refreshChats = () => {
+    setChatHistory(chatService.getChats());
+  };
+
+  /* ───────────── INITIAL LOAD ───────────── */
+  useEffect(() => {
+    let chats = chatService.getChats();
+
+    if (chats.length === 0) {
+      const initialChat = chatService.createChat();
+      chats = [initialChat];
+    }
+
+    const active = chatService.getActiveChat() ?? chats[0].id;
+
+    setChatHistory(chats);
+    setActiveChatId(active);
+
+    window.dispatchEvent(
+      new CustomEvent('active-chat-changed', { detail: active })
+    );
+  }, []);
+
+  /* ───────────── DERIVED SECTIONS ───────────── */
+  const pinnedChats = chatHistory.filter((c) => c.isPinned);
+  const recentChats = chatHistory.filter((c) => !c.isPinned);
 
   const roleLabels: Record<UserRole, string> = {
     admin: 'Administrator',
@@ -42,159 +82,248 @@ export function Sidebar({ userRole, userName, onLogout }: SidebarProps) {
     employee: 'bg-muted text-muted-foreground border border-border',
   };
 
-  const handleDeleteChat = (id: string) => {
-    setChatHistory((prev) => prev.filter((chat) => chat.id !== id));
-    if (activeChatId === id) setActiveChatId(null);
+  /* ───────────── CHAT ACTIONS ───────────── */
+
+  const activateChat = (chatId: string) => {
+    setActiveChatId(chatId);
+    chatService.setActiveChat(chatId);
+
+    window.dispatchEvent(
+      new CustomEvent('active-chat-changed', { detail: chatId })
+    );
   };
 
   const handleNewChat = () => {
-    setActiveChatId(null);
+    const newChat = chatService.createChat();
+    refreshChats();
+    activateChat(newChat.id);
   };
 
-  const toggleHistory = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setHistoryOpen(!historyOpen);
+  const handleDeleteChat = (chatId: string) => {
+    chatService.deleteChat(chatId);
+    const updated = chatService.getChats();
+    setChatHistory(updated);
+
+    if (updated.length > 0) {
+      activateChat(updated[0].id);
+    } else {
+      setActiveChatId(null);
+    }
   };
 
   return (
-    <aside className="w-72 bg-sidebar border-r border-sidebar-border flex flex-col h-screen">
-      {/* Header */}
-      <div className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center justify-between">
+    <aside
+      className={cn(
+        'h-screen flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300',
+        collapsed ? 'w-16' : 'w-72'
+      )}
+    >
+      {/* ───────────── HEADER ───────────── */}
+      <div className="flex items-center justify-between p-3 border-b border-sidebar-border">
+        {!collapsed && (
           <div>
             <h1 className="text-lg font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               PolicyRAG
             </h1>
-            <p className="text-2xs text-muted-foreground">Enterprise Policy Assistant</p>
+            <p className="text-2xs text-muted-foreground">
+              Enterprise Policy Assistant
+            </p>
           </div>
-          <ThemeSwitcher />
+        )}
+
+        <div className="flex items-center gap-2">
+          {!collapsed && <ThemeSwitcher />}
+          <Button variant="ghost" size="icon" onClick={onToggleCollapse}>
+            {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+          </Button>
         </div>
       </div>
 
-      {/* New Chat Button */}
+      {/* ───────────── NEW CHAT ───────────── */}
       <div className="p-3 border-b border-sidebar-border">
         <Button
           variant="outline"
           size="sm"
-          className="w-full justify-start gap-2 bg-gradient-to-r from-primary/10 to-transparent border-primary/30 hover:border-primary/50 hover:bg-primary/20 transition-all"
           onClick={handleNewChat}
+          className={cn(
+            'w-full gap-2',
+            collapsed ? 'justify-center px-0' : 'justify-start'
+          )}
         >
           <Plus className="h-4 w-4" />
-          New Chat
+          {!collapsed && 'New Chat'}
         </Button>
       </div>
 
-      {/* Chat History Section */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <button
-          type="button"
-          onClick={toggleHistory}
-          className="flex items-center justify-between px-4 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 transition-colors w-full text-left"
-        >
-          <div className="flex items-center gap-2">
-            <History className="h-3.5 w-3.5" />
-            <span>Chat History</span>
-            <span className="text-2xs bg-muted px-1.5 py-0.5 rounded-full">{chatHistory.length}</span>
-          </div>
-          <ChevronRight className={cn(
-            "h-3.5 w-3.5 transition-transform duration-200",
-            historyOpen && "rotate-90"
-          )} />
-        </button>
-        
-        <div className={cn(
-          "overflow-hidden transition-all duration-200",
-          historyOpen ? "flex-1" : "h-0"
-        )}>
-          <ScrollArea className="h-full px-2">
-            <div className="space-y-1 py-1 pr-2">
-              {chatHistory.length === 0 ? (
-                <p className="text-2xs text-muted-foreground px-3 py-4 text-center">
-                  No chat history yet
-                </p>
-              ) : (
-                chatHistory.map((session) => (
-                  <ChatHistoryItem
-                    key={session.id}
-                    session={session}
-                    isActive={activeChatId === session.id}
-                    onClick={() => setActiveChatId(session.id)}
-                    onDelete={() => handleDeleteChat(session.id)}
-                  />
-                ))
-              )}
+      {/* ───────────── CHAT HISTORY ───────────── */}
+      {!collapsed && (
+        <div className="flex-1 min-h-0">
+          <button
+            onClick={() => setHistoryOpen((v) => !v)}
+            className="flex items-center justify-between w-full px-4 py-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <div className="flex items-center gap-2">
+              <History size={14} />
+              Chat History ({chatHistory.length})
             </div>
-          </ScrollArea>
-        </div>
-      </div>
+            <ChevronRight
+              size={14}
+              className={cn(historyOpen && 'rotate-90')}
+            />
+          </button>
 
-      {/* Navigation */}
-      <nav className="p-3 space-y-1 border-t border-sidebar-border" aria-label="Main navigation">
-        <p className="px-3 py-1 text-2xs font-medium text-muted-foreground uppercase tracking-wider">Navigation</p>
-        <NavLink
+          {historyOpen && (
+            <ScrollArea className="h-full px-2">
+              <div className="space-y-2 pb-2">
+
+                {/* 📌 PINNED */}
+                {pinnedChats.length > 0 && (
+                  <div>
+                    <p className="px-3 py-1 text-2xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Pinned
+                    </p>
+                    {pinnedChats.map((session) => (
+                      <ChatHistoryItem
+                        key={session.id}
+                        session={session}
+                        isActive={activeChatId === session.id}
+                        onClick={() => activateChat(session.id)}
+                        onDelete={() => handleDeleteChat(session.id)}
+                        onTogglePin={() => {
+                          chatService.togglePin(session.id);
+                          refreshChats();
+                        }}
+                        onRename={(title) => {
+                          chatService.renameChat(session.id, title);
+                          refreshChats();
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* 🕘 RECENT */}
+                {recentChats.length > 0 && (
+                  <div>
+                    <p className="px-3 py-1 text-2xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Recent
+                    </p>
+                    {recentChats.map((session) => (
+                      <ChatHistoryItem
+                        key={session.id}
+                        session={session}
+                        isActive={activeChatId === session.id}
+                        onClick={() => activateChat(session.id)}
+                        onDelete={() => handleDeleteChat(session.id)}
+                        onTogglePin={() => {
+                          chatService.togglePin(session.id);
+                          refreshChats();
+                        }}
+                        onRename={(title) => {
+                          chatService.renameChat(session.id, title);
+                          refreshChats();
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+      )}
+
+      {/* ───────────── NAVIGATION ───────────── */}
+      <nav className="p-2 space-y-1 border-t border-sidebar-border">
+        <SidebarLink
           to="/chat"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-all"
-          activeClassName="bg-gradient-to-r from-primary/20 to-transparent text-primary font-medium shadow-sm"
-        >
-          <MessageSquare className="h-4 w-4" aria-hidden="true" />
-          Policy Chat
-        </NavLink>
+          icon={<MessageSquare size={18} />}
+          label="Policy Chat"
+          collapsed={collapsed}
+        />
 
         {isHRorAdmin && (
-          <NavLink
+          <SidebarLink
             to="/admin/policies"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-all"
-            activeClassName="bg-gradient-to-r from-primary/20 to-transparent text-primary font-medium shadow-sm"
-          >
-            <FileText className="h-4 w-4" aria-hidden="true" />
-            Manage Policies
-          </NavLink>
+            icon={<FileText size={18} />}
+            label="Manage Policies"
+            collapsed={collapsed}
+          />
         )}
 
         {isAdmin && (
-          <NavLink
-            to="/admin/users"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-all"
-            activeClassName="bg-gradient-to-r from-primary/20 to-transparent text-primary font-medium shadow-sm"
-          >
-            <Users className="h-4 w-4" aria-hidden="true" />
-            User Management
-          </NavLink>
-        )}
-
-        {isAdmin && (
-          <NavLink
-            to="/admin/settings"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-all"
-            activeClassName="bg-gradient-to-r from-primary/20 to-transparent text-primary font-medium shadow-sm"
-          >
-            <Settings className="h-4 w-4" aria-hidden="true" />
-            Settings
-          </NavLink>
+          <>
+            <SidebarLink
+              to="/admin/users"
+              icon={<Users size={18} />}
+              label="User Management"
+              collapsed={collapsed}
+            />
+            <SidebarLink
+              to="/admin/settings"
+              icon={<Settings size={18} />}
+              label="Settings"
+              collapsed={collapsed}
+            />
+          </>
         )}
       </nav>
 
-      {/* User Info */}
-      <div className="p-3 border-t border-sidebar-border bg-gradient-to-t from-sidebar-accent/50 to-transparent">
-        <div className="px-3 py-2 mb-2 rounded-lg bg-card/50 backdrop-blur-sm">
-          <p className="text-sm font-medium text-sidebar-foreground truncate">{userName}</p>
-          <span className={cn(
-            "inline-flex items-center mt-1.5 px-2 py-0.5 text-2xs font-medium rounded-full",
-            roleColors[userRole]
-          )}>
-            {roleLabels[userRole]}
-          </span>
-        </div>
+      {/* ───────────── USER FOOTER ───────────── */}
+      <div className="p-3 border-t border-sidebar-border">
+        {!collapsed && (
+          <div className="mb-2 px-3 py-2 rounded-lg bg-card/50">
+            <p className="text-sm font-medium truncate">{userName}</p>
+            <span
+              className={cn(
+                'mt-1 inline-flex px-2 py-0.5 text-2xs rounded-full',
+                roleColors[userRole]
+              )}
+            >
+              {roleLabels[userRole]}
+            </span>
+          </div>
+        )}
+
         <Button
           variant="ghost"
           size="sm"
           onClick={onLogout}
-          className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+          className={cn(
+            'w-full',
+            collapsed ? 'justify-center' : 'justify-start'
+          )}
         >
-          <LogOut className="h-4 w-4 mr-2" aria-hidden="true" />
-          Sign out
+          <LogOut size={16} />
+          {!collapsed && <span className="ml-2">Sign out</span>}
         </Button>
       </div>
     </aside>
+  );
+}
+
+/* ───────────── Helper ───────────── */
+
+function SidebarLink({
+  to,
+  icon,
+  label,
+  collapsed,
+}: {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  collapsed: boolean;
+}) {
+  return (
+    <NavLink
+      to={to}
+      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-sidebar-accent"
+      activeClassName="bg-gradient-to-r from-primary/20 to-transparent text-primary font-medium"
+    >
+      {icon}
+      {!collapsed && <span>{label}</span>}
+    </NavLink>
   );
 }

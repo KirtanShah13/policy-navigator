@@ -1,6 +1,13 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  ReactNode,
+} from 'react';
 
-type Theme = 'light' | 'dark';
+type Theme = 'light' | 'dark' | 'system';
 type ColorTheme = 'ocean' | 'emerald' | 'sunset' | 'violet' | 'rose';
 
 interface ThemeContextType {
@@ -10,54 +17,90 @@ interface ThemeContextType {
   setColorTheme: (colorTheme: ColorTheme) => void;
 }
 
+const STORAGE_THEME = 'policyrag_theme';
+const STORAGE_COLOR = 'policyrag_color_theme';
+
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+/* ---------------- helpers ---------------- */
+
+function isTheme(value: string | null): value is Theme {
+  return value === 'light' || value === 'dark' || value === 'system';
+}
+
+function isColorTheme(value: string | null): value is ColorTheme {
+  return (
+    value === 'ocean' ||
+    value === 'emerald' ||
+    value === 'sunset' ||
+    value === 'violet' ||
+    value === 'rose'
+  );
+}
+
+function getSystemTheme(): 'light' | 'dark' {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+}
+
+/* ---------------- provider ---------------- */
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    const stored = localStorage.getItem('policyrag_theme');
-    return (stored as Theme) || 'light';
+  const [theme, setTheme] = useState<Theme>(() => {
+    const stored = localStorage.getItem(STORAGE_THEME);
+    return isTheme(stored) ? stored : 'system';
   });
 
-  const [colorTheme, setColorThemeState] = useState<ColorTheme>(() => {
-    const stored = localStorage.getItem('policyrag_color_theme');
-    return (stored as ColorTheme) || 'ocean';
+  const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
+    const stored = localStorage.getItem(STORAGE_COLOR);
+    return isColorTheme(stored) ? stored : 'ocean';
   });
 
-  useEffect(() => {
+  /* Apply theme BEFORE paint to avoid flicker */
+  useLayoutEffect(() => {
     const root = document.documentElement;
-    
-    // Handle light/dark mode
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    
-    // Handle color theme
+
+    const resolvedTheme = theme === 'system' ? getSystemTheme() : theme;
+
+    root.classList.toggle('dark', resolvedTheme === 'dark');
     root.setAttribute('data-theme', colorTheme);
-    
-    localStorage.setItem('policyrag_theme', theme);
-    localStorage.setItem('policyrag_color_theme', colorTheme);
   }, [theme, colorTheme]);
 
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-  };
+  /* Persist preferences */
+  useEffect(() => {
+    localStorage.setItem(STORAGE_THEME, theme);
+    localStorage.setItem(STORAGE_COLOR, colorTheme);
+  }, [theme, colorTheme]);
 
-  const setColorTheme = (newColorTheme: ColorTheme) => {
-    setColorThemeState(newColorTheme);
-  };
+  /* React to system theme changes */
+  useEffect(() => {
+    if (theme !== 'system') return;
+
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = () => {
+      const root = document.documentElement;
+      root.classList.toggle('dark', media.matches);
+    };
+
+    media.addEventListener('change', handler);
+    return () => media.removeEventListener('change', handler);
+  }, [theme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, colorTheme, setTheme, setColorTheme }}>
+    <ThemeContext.Provider
+      value={{ theme, colorTheme, setTheme, setColorTheme }}
+    >
       {children}
     </ThemeContext.Provider>
   );
 }
 
+/* ---------------- hook ---------------- */
+
 export function useTheme() {
   const context = useContext(ThemeContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;
