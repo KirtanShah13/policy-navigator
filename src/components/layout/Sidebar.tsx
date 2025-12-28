@@ -26,6 +26,7 @@ interface SidebarProps {
   onLogout: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  onOpenProfile: () => void; // ✅ REQUIRED
 }
 
 export function Sidebar({
@@ -34,6 +35,7 @@ export function Sidebar({
   onLogout,
   collapsed,
   onToggleCollapse,
+  onOpenProfile, // ✅ ACCEPTED
 }: SidebarProps) {
   const isAdmin = userRole === 'admin';
   const isHRorAdmin = userRole === 'hr' || userRole === 'admin';
@@ -42,12 +44,10 @@ export function Sidebar({
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
 
-  /* ───────────── SINGLE SOURCE OF TRUTH ───────────── */
   const refreshChats = () => {
     setChatHistory(chatService.getChats());
   };
 
-  /* ───────────── INITIAL LOAD ───────────── */
   useEffect(() => {
     let chats = chatService.getChats();
 
@@ -57,7 +57,6 @@ export function Sidebar({
     }
 
     const active = chatService.getActiveChat() ?? chats[0].id;
-
     setChatHistory(chats);
     setActiveChatId(active);
 
@@ -66,7 +65,6 @@ export function Sidebar({
     );
   }, []);
 
-  /* ───────────── DERIVED SECTIONS ───────────── */
   const pinnedChats = chatHistory.filter((c) => c.isPinned);
   const recentChats = chatHistory.filter((c) => !c.isPinned);
 
@@ -81,8 +79,6 @@ export function Sidebar({
     hr: 'bg-role-hr/15 text-role-hr border border-role-hr/30',
     employee: 'bg-muted text-muted-foreground border border-border',
   };
-
-  /* ───────────── CHAT ACTIONS ───────────── */
 
   const activateChat = (chatId: string) => {
     setActiveChatId(chatId);
@@ -118,7 +114,7 @@ export function Sidebar({
         collapsed ? 'w-16' : 'w-72'
       )}
     >
-      {/* ───────────── HEADER ───────────── */}
+      {/* HEADER */}
       <div className="flex items-center justify-between p-3 border-b border-sidebar-border">
         {!collapsed && (
           <div>
@@ -139,7 +135,7 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* ───────────── NEW CHAT ───────────── */}
+      {/* NEW CHAT */}
       <div className="p-3 border-b border-sidebar-border">
         <Button
           variant="outline"
@@ -155,7 +151,7 @@ export function Sidebar({
         </Button>
       </div>
 
-      {/* ───────────── CHAT HISTORY ───────────── */}
+      {/* CHAT HISTORY */}
       {!collapsed && (
         <div className="flex-1 min-h-0">
           <button
@@ -175,66 +171,30 @@ export function Sidebar({
           {historyOpen && (
             <ScrollArea className="h-full px-2">
               <div className="space-y-2 pb-2">
-
-                {/* 📌 PINNED */}
-                {pinnedChats.length > 0 && (
-                  <div>
-                    <p className="px-3 py-1 text-2xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Pinned
-                    </p>
-                    {pinnedChats.map((session) => (
-                      <ChatHistoryItem
-                        key={session.id}
-                        session={session}
-                        isActive={activeChatId === session.id}
-                        onClick={() => activateChat(session.id)}
-                        onDelete={() => handleDeleteChat(session.id)}
-                        onTogglePin={() => {
-                          chatService.togglePin(session.id);
-                          refreshChats();
-                        }}
-                        onRename={(title) => {
-                          chatService.renameChat(session.id, title);
-                          refreshChats();
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* 🕘 RECENT */}
-                {recentChats.length > 0 && (
-                  <div>
-                    <p className="px-3 py-1 text-2xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Recent
-                    </p>
-                    {recentChats.map((session) => (
-                      <ChatHistoryItem
-                        key={session.id}
-                        session={session}
-                        isActive={activeChatId === session.id}
-                        onClick={() => activateChat(session.id)}
-                        onDelete={() => handleDeleteChat(session.id)}
-                        onTogglePin={() => {
-                          chatService.togglePin(session.id);
-                          refreshChats();
-                        }}
-                        onRename={(title) => {
-                          chatService.renameChat(session.id, title);
-                          refreshChats();
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-
+                {[...pinnedChats, ...recentChats].map((session) => (
+                  <ChatHistoryItem
+                    key={session.id}
+                    session={session}
+                    isActive={activeChatId === session.id}
+                    onClick={() => activateChat(session.id)}
+                    onDelete={() => handleDeleteChat(session.id)}
+                    onTogglePin={() => {
+                      chatService.togglePin(session.id);
+                      refreshChats();
+                    }}
+                    onRename={(title) => {
+                      chatService.renameChat(session.id, title);
+                      refreshChats();
+                    }}
+                  />
+                ))}
               </div>
             </ScrollArea>
           )}
         </div>
       )}
 
-      {/* ───────────── NAVIGATION ───────────── */}
+      {/* NAVIGATION */}
       <nav className="p-2 space-y-1 border-t border-sidebar-border">
         <SidebarLink
           to="/chat"
@@ -270,10 +230,13 @@ export function Sidebar({
         )}
       </nav>
 
-      {/* ───────────── USER FOOTER ───────────── */}
+      {/* USER FOOTER */}
       <div className="p-3 border-t border-sidebar-border">
         {!collapsed && (
-          <div className="mb-2 px-3 py-2 rounded-lg bg-card/50">
+          <div
+            onClick={onOpenProfile} // ✅ THIS WAS MISSING
+            className="mb-2 px-3 py-2 rounded-lg bg-card/50 cursor-pointer hover:bg-card"
+          >
             <p className="text-sm font-medium truncate">{userName}</p>
             <span
               className={cn(
@@ -302,8 +265,6 @@ export function Sidebar({
     </aside>
   );
 }
-
-/* ───────────── Helper ───────────── */
 
 function SidebarLink({
   to,

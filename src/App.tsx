@@ -11,6 +11,7 @@ import AdminPolicies from "./pages/AdminPolicies";
 import AdminUsers from "./pages/AdminUsers";
 import AdminSettings from "./pages/AdminSettings";
 import NotFound from "./pages/NotFound";
+import Terms from '@/pages/Terms';
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,8 @@ const App = () => (
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
             <Route path="*" element={<NotFound />} />
+            <Route path="/terms" element={<Terms />} />
+
           </Routes>
         </BrowserRouter>
       </TooltipProvider>

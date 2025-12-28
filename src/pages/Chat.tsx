@@ -76,7 +76,7 @@ export default function Chat() {
     setUser(JSON.parse(storedUser));
   }, [navigate]);
 
-  /* ---------------- LOAD ACTIVE CHAT & MESSAGES ---------------- */
+  /* ---------------- LOAD ACTIVE CHAT ---------------- */
 
   useEffect(() => {
     const loadChat = (chatId?: string) => {
@@ -92,21 +92,18 @@ export default function Chat() {
 
       const storedMessages = chatMessageService
         .getMessages(id)
-        .map((msg) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp),
+        .map((m) => ({
+          ...m,
+          timestamp: new Date(m.timestamp),
         }));
 
       setMessages(storedMessages);
     };
 
-    // Initial load
     loadChat();
 
-    // Listen for sidebar-triggered chat changes
     const handler = (e: Event) => {
-      const chatId = (e as CustomEvent<string>).detail;
-      loadChat(chatId);
+      loadChat((e as CustomEvent<string>).detail);
     };
 
     window.addEventListener('active-chat-changed', handler);
@@ -143,6 +140,7 @@ export default function Chat() {
 
     chatMessageService.appendMessage(activeChatId, userMessage);
     chatService.incrementMessageCount(activeChatId);
+    chatService.updateLastMessagePreview(activeChatId, userMessage.content);
 
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
@@ -152,13 +150,9 @@ export default function Chat() {
     const lower = content.toLowerCase();
     let template = demoResponses.default;
 
-    if (lower.includes('pto') || lower.includes('vacation')) {
-      template = demoResponses.pto;
-    } else if (lower.includes('password') || lower.includes('mfa')) {
-      template = demoResponses.password;
-    } else if (lower.includes('expense') || lower.includes('receipt')) {
-      template = demoResponses.expense;
-    }
+    if (lower.includes('pto') || lower.includes('vacation')) template = demoResponses.pto;
+    else if (lower.includes('password') || lower.includes('mfa')) template = demoResponses.password;
+    else if (lower.includes('expense') || lower.includes('receipt')) template = demoResponses.expense;
 
     const assistantMessage: ChatMessageType = {
       ...template,
@@ -169,6 +163,10 @@ export default function Chat() {
 
     chatMessageService.appendMessage(activeChatId, assistantMessage);
     chatService.incrementMessageCount(activeChatId);
+    chatService.updateLastMessagePreview(
+      activeChatId,
+      assistantMessage.content
+    );
 
     setMessages((prev) => [...prev, assistantMessage]);
     setIsLoading(false);
@@ -192,9 +190,8 @@ export default function Chat() {
   if (!user) return null;
 
   return (
-    <AppLayout userRole={user.role} userName={user.name} onLogout={handleLogout}>
+    <AppLayout user={user} onLogout={handleLogout}>
       <div className="flex flex-col h-full">
-        {/* Header */}
         <header className="flex items-center justify-between px-6 py-4 border-b">
           <div>
             <h2 className="text-lg font-semibold">Policy Assistant</h2>
@@ -205,7 +202,6 @@ export default function Chat() {
           <PolicySelector value={selectedScope} onChange={setSelectedScope} />
         </header>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto py-6 px-4 space-y-4">
             {messages.length === 0 && (
@@ -233,7 +229,6 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* Input */}
         <ChatInput onSubmit={handleSubmit} disabled={isLoading} />
       </div>
     </AppLayout>

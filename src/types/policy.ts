@@ -62,4 +62,5 @@ export interface ChatSession {
   messageCount: number;
   isPinned?: boolean;
   lastUpdated?: Date | string;
+  lastMessagePreview?: string;
 }

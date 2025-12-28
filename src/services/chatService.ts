@@ -76,6 +76,7 @@ export const chatService = {
       lastUpdated: new Date(),
       messageCount: 0,
       isPinned: false,
+      lastMessagePreview: '',
     };
 
     const sessions = loadSessions();
@@ -94,7 +95,6 @@ export const chatService = {
     const sessions = loadSessions().filter((c) => c.id !== chatId);
     saveSessions(sessions);
 
-    // 🔴 Critical: also delete messages for this chat
     chatMessageService.deleteMessages(chatId);
 
     const active = getActiveChatId();
@@ -120,7 +120,7 @@ export const chatService = {
     saveSessions(sessions);
   },
 
-    /**
+  /**
    * Pin / unpin a chat session
    */
   togglePin(chatId: string) {
@@ -129,7 +129,7 @@ export const chatService = {
         ? {
             ...c,
             isPinned: !c.isPinned,
-            lastUpdated: new Date(), // 🔥 REQUIRED
+            lastUpdated: new Date(),
           }
         : c
     );
@@ -137,11 +137,8 @@ export const chatService = {
     saveSessions(sessions);
   },
 
-
-
   /**
    * Increment message count
-   * (call once per user/assistant message)
    */
   incrementMessageCount(chatId: string) {
     const sessions = loadSessions().map((c) =>
@@ -149,6 +146,28 @@ export const chatService = {
         ? {
             ...c,
             messageCount: c.messageCount + 1,
+            lastUpdated: new Date(),
+          }
+        : c
+    );
+
+    saveSessions(sessions);
+  },
+
+  /**
+   * ✅ Update last message preview (USED BY SIDEBAR)
+   */
+  updateLastMessagePreview(chatId: string, content: string) {
+    const preview = content
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 80);
+
+    const sessions = loadSessions().map((c) =>
+      c.id === chatId
+        ? {
+            ...c,
+            lastMessagePreview: preview,
             lastUpdated: new Date(),
           }
         : c
