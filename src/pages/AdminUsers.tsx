@@ -80,21 +80,28 @@ const statusStyles: Record<ManagedUser['status'], string> = {
 export default function AdminUsers() {
   const navigate = useNavigate();
   const { toast } = useToast();
+
   const [user, setUser] = useState<User | null>(null);
   const [users] = useState<ManagedUser[]>(demoUsers);
 
+  /* ---------------- AUTH / ROLE GUARD ---------------- */
+
   useEffect(() => {
     const storedUser = localStorage.getItem('policyrag_user');
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser);
-      if (parsed.role !== 'admin') {
-        navigate('/chat');
-        return;
-      }
-      setUser(parsed);
-    } else {
+
+    if (!storedUser) {
       navigate('/auth');
+      return;
     }
+
+    const parsed: User = JSON.parse(storedUser);
+
+    if (parsed.role !== 'admin') {
+      navigate('/chat');
+      return;
+    }
+
+    setUser(parsed);
   }, [navigate]);
 
   const handleLogout = () => {
@@ -105,33 +112,36 @@ export default function AdminUsers() {
   const handleInvite = () => {
     toast({
       title: 'Invite user',
-      description: 'User invitation will be available when backend is connected.',
+      description:
+        'User invitation will be available when backend is connected.',
     });
   };
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
+
+  /* ---------------- RENDER ---------------- */
 
   return (
-    <AppLayout userRole={user.role} userName={user.name} onLogout={handleLogout}>
+    <AppLayout user={user} onLogout={handleLogout}>
       <div className="flex flex-col h-full">
         <header className="px-6 py-4 border-b border-border bg-background">
-          <h2 className="text-lg font-semibold text-foreground">User Management</h2>
-          <p className="text-sm text-muted-foreground">Manage user access and roles</p>
+          <h2 className="text-lg font-semibold">User Management</h2>
+          <p className="text-sm text-muted-foreground">
+            Manage user access and roles
+          </p>
         </header>
 
         <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">Users</h3>
+                <h3 className="text-lg font-semibold">Users</h3>
                 <p className="text-sm text-muted-foreground">
                   {users.filter((u) => u.status === 'active').length} active users
                 </p>
               </div>
               <Button onClick={handleInvite}>
-                <UserPlus className="h-4 w-4 mr-2" aria-hidden="true" />
+                <UserPlus className="h-4 w-4 mr-2" />
                 Invite User
               </Button>
             </div>
@@ -140,48 +150,56 @@ export default function AdminUsers() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="font-medium">User</TableHead>
-                    <TableHead className="font-medium">Role</TableHead>
-                    <TableHead className="font-medium">Status</TableHead>
-                    <TableHead className="font-medium">Last Active</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Last Active</TableHead>
                     <TableHead className="w-[100px]">
                       <span className="sr-only">Actions</span>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((managedUser) => (
-                    <TableRow key={managedUser.id}>
+                  {users.map((u) => (
+                    <TableRow key={u.id}>
                       <TableCell>
-                        <div>
-                          <p className="font-medium text-foreground">{managedUser.name}</p>
-                          <p className="text-sm text-muted-foreground">{managedUser.email}</p>
-                        </div>
+                        <p className="font-medium">{u.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {u.email}
+                        </p>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={roleStyles[managedUser.role]}>
-                          {managedUser.role.charAt(0).toUpperCase() + managedUser.role.slice(1)}
+                        <Badge variant="outline" className={roleStyles[u.role]}>
+                          {u.role}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={statusStyles[managedUser.status]}>
-                          {managedUser.status.charAt(0).toUpperCase() + managedUser.status.slice(1)}
+                        <Badge
+                          variant="outline"
+                          className={statusStyles[u.status]}
+                        >
+                          {u.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {managedUser.lastActive.toLocaleDateString()}
+                        {u.lastActive.toLocaleDateString()}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem>Edit Role</DropdownMenuItem>
-                            <DropdownMenuItem>Reset Password</DropdownMenuItem>
+                            <DropdownMenuItem>
+                              Reset Password
+                            </DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive">
                               Disable Account
                             </DropdownMenuItem>

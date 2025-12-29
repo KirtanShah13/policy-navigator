@@ -5,7 +5,8 @@ import { PolicyTable } from '@/components/admin/PolicyTable';
 import { Policy, User } from '@/types/policy';
 import { useToast } from '@/hooks/use-toast';
 
-// Demo policies
+/* ---------------- DEMO POLICIES ---------------- */
+
 const demoPolicies: Policy[] = [
   {
     id: '1',
@@ -69,24 +70,33 @@ const demoPolicies: Policy[] = [
   },
 ];
 
+/* ---------------- COMPONENT ---------------- */
+
 export default function AdminPolicies() {
   const navigate = useNavigate();
   const { toast } = useToast();
+
   const [user, setUser] = useState<User | null>(null);
   const [policies, setPolicies] = useState<Policy[]>(demoPolicies);
 
+  /* ---------------- AUTH / ROLE GUARD ---------------- */
+
   useEffect(() => {
     const storedUser = localStorage.getItem('policyrag_user');
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser);
-      if (parsed.role === 'employee') {
-        navigate('/chat');
-        return;
-      }
-      setUser(parsed);
-    } else {
+
+    if (!storedUser) {
       navigate('/auth');
+      return;
     }
+
+    const parsed: User = JSON.parse(storedUser);
+
+    if (parsed.role === 'employee') {
+      navigate('/chat');
+      return;
+    }
+
+    setUser(parsed);
   }, [navigate]);
 
   const handleLogout = () => {
@@ -94,18 +104,23 @@ export default function AdminPolicies() {
     navigate('/auth');
   };
 
+  /* ---------------- ACTIONS ---------------- */
+
   const handleReindex = (policyId: string) => {
     const policy = policies.find((p) => p.id === policyId);
+
     toast({
       title: 'Re-indexing started',
       description: `${policy?.name} is being re-indexed. This may take a few minutes.`,
     });
 
-    // Simulate re-indexing
     setTimeout(() => {
       setPolicies((prev) =>
-        prev.map((p) => (p.id === policyId ? { ...p, indexed: true } : p))
+        prev.map((p) =>
+          p.id === policyId ? { ...p, indexed: true } : p
+        )
       );
+
       toast({
         title: 'Re-indexing complete',
         description: `${policy?.name} has been successfully re-indexed.`,
@@ -116,24 +131,31 @@ export default function AdminPolicies() {
   const handleUpload = () => {
     toast({
       title: 'Upload policy',
-      description: 'Policy upload functionality will be available when backend is connected.',
+      description:
+        'Policy upload functionality will be available when backend is connected.',
     });
   };
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
+
+  /* ---------------- RENDER ---------------- */
 
   return (
-    <AppLayout userRole={user.role} userName={user.name} onLogout={handleLogout}>
+    <AppLayout user={user} onLogout={handleLogout}>
       <div className="flex flex-col h-full">
         <header className="px-6 py-4 border-b border-border bg-background">
-          <h2 className="text-lg font-semibold text-foreground">Policy Management</h2>
-          <p className="text-sm text-muted-foreground">Upload, update, and manage policy documents</p>
+          <h2 className="text-lg font-semibold">Policy Management</h2>
+          <p className="text-sm text-muted-foreground">
+            Upload, update, and manage policy documents
+          </p>
         </header>
 
         <div className="flex-1 overflow-y-auto p-6">
-          <PolicyTable policies={policies} onReindex={handleReindex} onUpload={handleUpload} />
+          <PolicyTable
+            policies={policies}
+            onReindex={handleReindex}
+            onUpload={handleUpload}
+          />
         </div>
       </div>
     </AppLayout>
