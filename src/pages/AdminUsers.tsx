@@ -20,6 +20,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
+import { InviteUserDialog } from '@/components/admin/InviteUserDialog';
+
+/* ---------------- TYPES ---------------- */
 
 interface ManagedUser {
   id: string;
@@ -29,6 +32,8 @@ interface ManagedUser {
   status: 'active' | 'pending' | 'disabled';
   lastActive: Date;
 }
+
+/* ---------------- DEMO USERS ---------------- */
 
 const demoUsers: ManagedUser[] = [
   {
@@ -65,6 +70,8 @@ const demoUsers: ManagedUser[] = [
   },
 ];
 
+/* ---------------- STYLES ---------------- */
+
 const roleStyles: Record<UserRole, string> = {
   admin: 'bg-role-admin/10 text-role-admin border-role-admin/20',
   hr: 'bg-role-hr/10 text-role-hr border-role-hr/20',
@@ -77,12 +84,15 @@ const statusStyles: Record<ManagedUser['status'], string> = {
   disabled: 'bg-muted text-muted-foreground border-border',
 };
 
+/* ---------------- COMPONENT ---------------- */
+
 export default function AdminUsers() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const [user, setUser] = useState<User | null>(null);
-  const [users] = useState<ManagedUser[]>(demoUsers);
+  const [users, setUsers] = useState<ManagedUser[]>(demoUsers);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   /* ---------------- AUTH / ROLE GUARD ---------------- */
 
@@ -109,11 +119,27 @@ export default function AdminUsers() {
     navigate('/auth');
   };
 
-  const handleInvite = () => {
+  /* ---------------- INVITE USER ---------------- */
+
+  const handleInviteUser = (invite: {
+    email: string;
+    name: string;
+    role: UserRole;
+  }) => {
+    const newUser: ManagedUser = {
+      id: crypto.randomUUID(),
+      email: invite.email,
+      name: invite.name,
+      role: invite.role,
+      status: 'pending',
+      lastActive: new Date(),
+    };
+
+    setUsers((prev) => [newUser, ...prev]);
+
     toast({
-      title: 'Invite user',
-      description:
-        'User invitation will be available when backend is connected.',
+      title: 'Invitation sent',
+      description: `Invite sent to ${invite.email}`,
     });
   };
 
@@ -123,6 +149,12 @@ export default function AdminUsers() {
 
   return (
     <AppLayout user={user} onLogout={handleLogout}>
+      <InviteUserDialog
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        onInvite={handleInviteUser}
+      />
+
       <div className="flex flex-col h-full">
         <header className="px-6 py-4 border-b border-border bg-background">
           <h2 className="text-lg font-semibold">User Management</h2>
@@ -140,7 +172,8 @@ export default function AdminUsers() {
                   {users.filter((u) => u.status === 'active').length} active users
                 </p>
               </div>
-              <Button onClick={handleInvite}>
+
+              <Button onClick={() => setInviteOpen(true)}>
                 <UserPlus className="h-4 w-4 mr-2" />
                 Invite User
               </Button>
@@ -159,6 +192,7 @@ export default function AdminUsers() {
                     </TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {users.map((u) => (
                     <TableRow key={u.id}>
@@ -168,11 +202,16 @@ export default function AdminUsers() {
                           {u.email}
                         </p>
                       </TableCell>
+
                       <TableCell>
-                        <Badge variant="outline" className={roleStyles[u.role]}>
+                        <Badge
+                          variant="outline"
+                          className={roleStyles[u.role]}
+                        >
                           {u.role}
                         </Badge>
                       </TableCell>
+
                       <TableCell>
                         <Badge
                           variant="outline"
@@ -181,9 +220,11 @@ export default function AdminUsers() {
                           {u.status}
                         </Badge>
                       </TableCell>
+
                       <TableCell className="text-muted-foreground">
                         {u.lastActive.toLocaleDateString()}
                       </TableCell>
+
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -195,13 +236,10 @@ export default function AdminUsers() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
+
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Edit Role</DropdownMenuItem>
-                            <DropdownMenuItem>
-                              Reset Password
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              Disable Account
+                            <DropdownMenuItem disabled>
+                              Backend actions coming soon
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

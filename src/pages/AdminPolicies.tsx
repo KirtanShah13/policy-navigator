@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PolicyTable } from '@/components/admin/PolicyTable';
+import { UploadPolicyDialog } from '@/components/admin/UploadPolicyDialog';
 import { Policy, User } from '@/types/policy';
 import { useToast } from '@/hooks/use-toast';
 
@@ -78,6 +79,7 @@ export default function AdminPolicies() {
 
   const [user, setUser] = useState<User | null>(null);
   const [policies, setPolicies] = useState<Policy[]>(demoPolicies);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   /* ---------------- AUTH / ROLE GUARD ---------------- */
 
@@ -106,12 +108,36 @@ export default function AdminPolicies() {
 
   /* ---------------- ACTIONS ---------------- */
 
+  const handleUploadPolicy = (policy: {
+    name: string;
+    scope: 'hr' | 'it' | 'security' | 'finance';
+    version: string;
+  }) => {
+    const newPolicy: Policy = {
+      id: crypto.randomUUID(),
+      name: policy.name,
+      scope: policy.scope,
+      version: policy.version,
+      lastUpdated: new Date(),
+      status: 'draft',
+      documentUrl: '#',
+      indexed: false,
+    };
+
+    setPolicies((prev) => [newPolicy, ...prev]);
+
+    toast({
+      title: 'Policy uploaded',
+      description: `${policy.name} has been added as a draft.`,
+    });
+  };
+
   const handleReindex = (policyId: string) => {
     const policy = policies.find((p) => p.id === policyId);
 
     toast({
       title: 'Re-indexing started',
-      description: `${policy?.name} is being re-indexed. This may take a few minutes.`,
+      description: `${policy?.name} is being re-indexed.`,
     });
 
     setTimeout(() => {
@@ -123,17 +149,9 @@ export default function AdminPolicies() {
 
       toast({
         title: 'Re-indexing complete',
-        description: `${policy?.name} has been successfully re-indexed.`,
+        description: `${policy?.name} is now indexed.`,
       });
     }, 2000);
-  };
-
-  const handleUpload = () => {
-    toast({
-      title: 'Upload policy',
-      description:
-        'Policy upload functionality will be available when backend is connected.',
-    });
   };
 
   if (!user) return null;
@@ -142,6 +160,12 @@ export default function AdminPolicies() {
 
   return (
     <AppLayout user={user} onLogout={handleLogout}>
+      <UploadPolicyDialog
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onUpload={handleUploadPolicy}
+      />
+
       <div className="flex flex-col h-full">
         <header className="px-6 py-4 border-b border-border bg-background">
           <h2 className="text-lg font-semibold">Policy Management</h2>
@@ -154,10 +178,11 @@ export default function AdminPolicies() {
           <PolicyTable
             policies={policies}
             onReindex={handleReindex}
-            onUpload={handleUpload}
+            onUpload={() => setUploadOpen(true)}
           />
         </div>
       </div>
     </AppLayout>
   );
 }
+  
