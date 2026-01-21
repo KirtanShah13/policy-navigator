@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Policy Navigator Orb</title>
+
+  <style>
+    :root {
+      --orb-size: 64px;
+      --halo-spill: 6px;
+
+      --core-main: #38bdf8;
+      --core-soft: #9ee7ff;
+      --core-deep: #0b1220;
+      --halo: rgba(56,189,248,0.6);
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    ::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* ==========================
+       DRAGGABLE ORB CONTAINER
+       ========================== */
+    .orb-wrapper {
+      width: var(--orb-size);
+      height: var(--orb-size);
+      position: relative;
+      cursor: pointer;
+      filter: drop-shadow(0 10px 20px rgba(0,0,0,0.6));
+      transition: transform 0.25s ease;
+      -webkit-app-region: drag;
+    }
+
+    /* ==========================
+       HALO
+       ========================== */
+    .halo {
+      position: absolute;
+      inset: calc(var(--halo-spill) * -1);
+      border-radius: 50%;
+      background: radial-gradient(
+        circle,
+        transparent 55%,
+        var(--halo) 70%,
+        transparent 78%
+      );
+      opacity: 0.85;
+      pointer-events: none;
+      animation: haloPulse 3.5s ease-in-out infinite;
+    }
+
+    /* ==========================
+       ORB (CLICK ZONE)
+       ========================== */
+    .orb {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background:
+        radial-gradient(
+          circle at 30% 25%,
+          var(--core-soft),
+          var(--core-main) 35%,
+          var(--core-deep) 72%
+        );
+      box-shadow:
+        inset 0 0 18px rgba(255,255,255,0.25),
+        inset -6px -10px 20px rgba(0,0,0,0.6);
+      overflow: hidden;
+      -webkit-app-region: no-drag;
+    }
+
+    .core {
+      position: absolute;
+      width: 55%;
+      height: 55%;
+      top: 22%;
+      left: 22%;
+      border-radius: 50%;
+      background: radial-gradient(
+        circle,
+        #ffffff,
+        var(--core-soft) 45%,
+        transparent 70%
+      );
+      opacity: 0.65;
+      filter: blur(1px);
+      animation: coreFloat 4s ease-in-out infinite;
+    }
+
+    .highlight {
+      position: absolute;
+      top: 10%;
+      left: 14%;
+      width: 30%;
+      height: 30%;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
+      opacity: 0.8;
+      pointer-events: none;
+    }
+
+    .orb-wrapper:hover {
+      transform: scale(1.08);
+    }
+
+    .orb-wrapper:active {
+      transform: scale(0.95);
+    }
+
+    @keyframes haloPulse {
+      0% { opacity: 0.4; }
+      50% { opacity: 0.9; }
+      100% { opacity: 0.4; }
+    }
+
+    @keyframes coreFloat {
+      0% { transform: translate(-2px, -2px); }
+      50% { transform: translate(2px, 2px); }
+      100% { transform: translate(-2px, -2px); }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="orb-wrapper">
+    <div class="halo"></div>
+    <div class="orb" onclick="window.orb.openApp()">
+      <div class="core"></div>
+      <div class="highlight"></div>
+    </div>
+  </div>
+</body>
+</html>

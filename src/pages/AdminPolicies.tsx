@@ -154,6 +154,21 @@ export default function AdminPolicies() {
     }, 2000);
   };
 
+  const handleArchivePolicy = (policyId: string) => {
+    setPolicies((prev) =>
+      prev.map((p) =>
+        p.id === policyId ? { ...p, status: 'archived' } : p
+      )
+    );
+
+    const policy = policies.find((p) => p.id === policyId);
+
+    toast({
+      title: 'Policy archived',
+      description: `${policy?.name} has been archived.`,
+    });
+  };
+
   if (!user) return null;
 
   /* ---------------- RENDER ---------------- */
@@ -179,10 +194,10 @@ export default function AdminPolicies() {
             policies={policies}
             onReindex={handleReindex}
             onUpload={() => setUploadOpen(true)}
+            onArchive={handleArchivePolicy}
           />
         </div>
       </div>
     </AppLayout>
   );
 }
-  
